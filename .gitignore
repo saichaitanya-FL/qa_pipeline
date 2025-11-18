@@ -72,7 +72,6 @@ secrets.json
 data/
 
 # Model files
-models/
 *.pkl
 *.joblib
 
