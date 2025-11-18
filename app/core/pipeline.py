@@ -9,7 +9,7 @@ from synthetic_data_kit.generators.qa_generator import QAGenerator
 from synthetic_data_kit.utils.text import split_into_chunks
 from synthetic_data_kit.parsers.pdf_parser import PDFParser
 
-from models.pipeline_models import PipelineConfig, ChunkConfig, QAGenerationConfig
+from app.models.schemas import PipelineConfig, ChunkConfig, QAGenerationConfig
 
 
 class QAGenerationPipeline:
@@ -30,7 +30,6 @@ class QAGenerationPipeline:
         """Extract text from PDF file content"""
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            # Create temporary file from bytes
             temp_dir = tempfile.mkdtemp()
             temp_file_path = os.path.join(temp_dir, "temp.pdf")
             
@@ -41,13 +40,11 @@ class QAGenerationPipeline:
                 parser = PDFParser()
                 text = parser.parse(temp_file_path)
                 
-                # Cleanup
                 os.remove(temp_file_path)
                 os.rmdir(temp_dir)
                 
                 return text
             except Exception as e:
-                # Cleanup on error
                 if os.path.exists(temp_file_path):
                     os.remove(temp_file_path)
                 if os.path.exists(temp_dir):
@@ -80,8 +77,11 @@ class QAGenerationPipeline:
             self.client.config["generation"]["max_tokens"] = config.max_generation_tokens
         
         all_qa_pairs = []
-        for chunk in config.chunks:
+        errors = []
+        
+        for i, chunk in enumerate(config.chunks):
             try:
+                print(f"Processing chunk {i+1}/{len(config.chunks)}...")
                 summary = self.generator.generate_summary(document_text=chunk)
                 qa_pairs = self.generator.generate_qa_pairs(
                     num_pairs=config.num_pairs,
@@ -90,8 +90,12 @@ class QAGenerationPipeline:
                 )
                 all_qa_pairs.extend(qa_pairs)
             except Exception as e:
-                print(f"Error processing chunk: {str(e)}")
+                error_msg = f"Error processing chunk {i+1}: {str(e)}"
+                print(error_msg)
+                errors.append(error_msg)
                 continue
+        
+        if not all_qa_pairs and errors:
+            raise Exception(f"Failed to generate any QA pairs. Errors: {'; '.join(errors)}")
+        
         return all_qa_pairs
-
-

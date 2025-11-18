@@ -15,15 +15,26 @@ A robust Question-Answer generation pipeline built with synthetic-data-kit that 
 
 ```
 qa-pipeline/
-├── src/
-│   ├── qa_generation/
+├── app/
+│   ├── api/
 │   │   ├── __init__.py
-│   │   └── pipeline.py          # Main pipeline implementation
-│   └── models/
-│       └── pipeline_models.py   # Pydantic validation models
-├── test_pipeline.py             # Testing script
+│   │   └── routes.py           # API endpoints
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── config.py           # Configuration
+│   │   └── pipeline.py         # QA generation pipeline
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── schemas.py          # Pydantic models
+│   ├── __init__.py
+│   └── main.py                 # FastAPI application
+├── tests/
+│   └── test_api.py             # API tests
+├── .env                        # Environment variables
+├── .env.example                # Example environment file
 ├── .gitignore                  # Git ignore rules
-└── README.md                   # This file
+├── README.md                   # This file
+└── requirements.txt            # Dependencies
 ```
 
 ## 🛠️ Installation
@@ -54,16 +65,47 @@ The pipeline requires:
 
 ## 🚀 Usage
 
+### FastAPI Endpoint
+
+1. **Create .env file**
+   ```bash
+   MODEL_NAME=openai/gpt-4o-mini
+   API_BASE=https://dev-gateway.flotorch.cloud/api/openai/v1
+   API_KEY=your-api-key
+   ```
+
+2. **Start the server**
+   ```bash
+   python run.py
+   ```
+   
+   Or:
+   ```bash
+   python -m app.main
+   ```
+
+3. **Generate QA pairs from PDF**
+   ```bash
+   curl -X POST "http://localhost:8000/generate-qa" \
+     -F "file=@document.pdf" \
+     -F "num_pairs=5" \
+     -F "chunk_size=2048" \
+     -F "overlap=200" \
+     -F "max_tokens=512" \
+     -F "max_chunks=10"
+   ```
+
 ### Python API
 
 ```python
-from src.qa_generation.pipeline import QAGenerationPipeline
+from app.core.pipeline import QAGenerationPipeline
+from app.core.config import MODEL_NAME, API_BASE, API_KEY
 
 # Initialize pipeline
 pipeline = QAGenerationPipeline(
-    model_name="openai/gpt-4o-mini",
-    api_base="https://your-api-endpoint.com/v1",
-    api_key="your-api-key"
+    model_name=MODEL_NAME,
+    api_base=API_BASE,
+    api_key=API_KEY
 )
 
 # Read PDF file
@@ -74,7 +116,7 @@ with open("document.pdf", "rb") as f:
 text = pipeline.extract_pdf_text(pdf_content)
 
 # Create chunks
-chunks = pipeline.chunk_text(text, chunk_size=2048, overlap=200)
+chunks = pipeline.chunk_text(text, max_sequence_lenght=2048, overlap=200)
 
 # Generate QA pairs
 qa_pairs = pipeline.generate_qa_pairs_from_text(
@@ -91,6 +133,48 @@ for i, qa in enumerate(qa_pairs, 1):
 ```
 
 ## 📋 API Reference
+
+### FastAPI Endpoints
+
+#### POST /generate-qa
+
+Generate QA pairs from uploaded PDF file.
+
+**Parameters:**
+- `file` (required): PDF file upload
+- `num_pairs` (optional, default=5): Number of QA pairs per chunk
+- `chunk_size` (optional, default=2048): Size of text chunks
+- `overlap` (optional, default=200): Overlap between chunks
+- `max_tokens` (optional, default=512): Maximum tokens for generation
+- `max_chunks` (optional, default=10): Maximum chunks to process
+
+**Response:**
+```json
+{
+  "filename": "document.pdf",
+  "text_length": 47338,
+  "num_chunks": 10,
+  "qa_pairs": [
+    {
+      "question": "What is AI?",
+      "answer": "Artificial Intelligence..."
+    }
+  ],
+  "total_pairs": 20
+}
+```
+
+#### GET /health
+
+Health check endpoint.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "pipeline_initialized": true
+}
+```
 
 ### QAGenerationPipeline
 
@@ -139,11 +223,14 @@ Located in `src/models/pipeline_models.py`:
 
 ## 🧪 Testing
 
-Test the pipeline directly:
+Test the API:
 
 ```bash
-cd src
-python qa_generation/pipeline.py
+# Start the server first
+python -m app.main
+
+# In another terminal, run tests
+python tests/test_api.py
 ```
 
 ## 🤝 Contributing
